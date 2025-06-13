@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to QR Converter</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            padding: 30px;
+            margin-top: 30px;
+        }
+        
+        h1 {
+            color: #4a6bff;
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+        
+        .upload-area {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 25px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #4a6bff;
+            background-color: #f8f9ff;
+        }
+        
+        .upload-area.highlight {
+            border-color: #4a6bff;
+            background-color: #f0f4ff;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            color: #4a6bff;
+            margin-bottom: 15px;
+        }
+        
+        .upload-text {
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            background-color: #4a6bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s;
+            margin-top: 15px;
+        }
+        
+        .btn:hover {
+            background-color: #3a5bef;
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            background-color: #d1d5db;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .settings {
+            background-color: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .api-key-input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            font-size: 16px;
+        }
+        
+        .result-container {
+            display: none;
+            margin-top: 30px;
+            text-align: center;
+        }
+        
+        .qr-code {
+            max-width: 300px;
+            width: 100%;
+            margin: 20px auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px;
+            background-color: white;
+        }
+        
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            color: #6b7280;
+            display: none;
+        }
+        
+        .error {
+            color: #ef4444;
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .preview-image {
+            max-width: 300px;
+            max-height: 300px;
+            margin: 15px auto;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .info-text {
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 15px;
+            text-align: center;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .upload-area {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image to QR Code Converter</h1>
+        
+        <div class="settings">
+            <input type="text" id="apiKey" class="api-key-input" placeholder="Enter your API key">
+        </div>
+        
+        <div id="uploadArea" class="upload-area">
+            <div class="upload-icon">📁</div>
+            <p class="upload-text">Drag & drop an image here or click to select</p>
+            <p class="info-text">Supports JPG, PNG, WEBP (Max 5MB)</p>
+            <input type="file" id="fileInput" class="file-input" accept="image/jpeg, image/png, image/webp">
+            <button id="uploadBtn" class="btn" disabled>Select Image</button>
+        </div>
+        
+        <div id="loading" class="loading">
+            <p>Converting image to QR code...</p>
+        </div>
+        
+        <div id="error" class="error"></div>
+        
+        <div id="resultContainer" class="result-container">
+            <h3>Your QR Code</h3>
+            <p>Scan this QR code to view your image</p>
+            <img id="qrCode" class="qr-code" src="" alt="QR Code">
+            <p class="info-text">Note: The image will be available for 10 minutes</p>
+            <button id="downloadBtn" class="btn">Download QR Code</button>
+        </div>
+        
+        <img id="previewImage" class="preview-image" src="" alt="Preview">
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const apiKeyInput = document.getElementById('apiKey');
+            const loadingElement = document.getElementById('loading');
+            const errorElement = document.getElementById('error');
+            const resultContainer = document.getElementById('resultContainer');
+            const qrCode = document.getElementById('qrCode');
+            const previewImage = document.getElementById('previewImage');
+            const downloadBtn = document.getElementById('downloadBtn');
+            
+            // API base URL - change if needed
+            const API_BASE_URL = "http://localhost:3000/api/v1/apicollection/convertimagetoqr";
+            
+            // Event listeners
+            uploadArea.addEventListener('click', () => fileInput.click());
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            apiKeyInput.addEventListener('input', toggleUploadButton);
+            downloadBtn.addEventListener('click', downloadQRCode);
+            
+            // Drag and drop events
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('highlight');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('highlight');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('highlight');
+                
+                if (e.dataTransfer.files.length) {
+                    fileInput.files = e.dataTransfer.files;
+                    handleFileSelect({ target: fileInput });
+                }
+            });
+            
+            function toggleUploadButton() {
+                uploadBtn.disabled = !apiKeyInput.value.trim();
+            }
+            
+            function handleFileSelect(event) {
+                const file = event.target.files[0];
+                
+                if (!file) return;
+                
+                // Check file type
+                const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                if (!validTypes.includes(file.type)) {
+                    showError('Please select a JPG, PNG, or WEBP image');
+                    return;
+                }
+                
+                // Check file size (5MB max)
+                if (file.size > 5 * 1024 * 1024) {
+                    showError('Image must be smaller than 5MB');
+                    return;
+                }
+                
+                // Show preview
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImage.src = e.target.result;
+                    previewImage.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+                
+                // Convert to QR code
+                convertImageToQR(file);
+            }
+            
+            async function convertImageToQR(file) {
+                const apiKey = apiKeyInput.value.trim();
+                
+                if (!apiKey) {
+                    showError('Please enter your API key');
+                    return;
+                }
+                
+                // Clear previous results and errors
+                resultContainer.style.display = 'none';
+                errorElement.style.display = 'none';
+                
+                // Show loading
+                loadingElement.style.display = 'block';
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('Image', file);
+                    
+                    const url = `${API_BASE_URL}?apikey=${encodeURIComponent(apiKey)}`;
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    console.log(response)
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'Conversion failed');
+                    }
+                    
+                    const qrBlob = await response.blob();
+                    const qrUrl = URL.createObjectURL(qrBlob);
+                    
+                    // Display QR code
+                    qrCode.src = qrUrl;
+                 
+                    resultContainer.style.display = 'block';
+                    
+                    // Store the blob URL for download
+                    downloadBtn.dataset.qrUrl = qrUrl;
+                    
+                } catch (error) {
+                    showError(`Error: ${error.message}`);
+                    console.error('Conversion Error:', error);
+                } finally {
+                    loadingElement.style.display = 'none';
+                }
+            }
+            
+            function downloadQRCode() {
+                const qrUrl = downloadBtn.dataset.qrUrl;
+                if (!qrUrl) return;
+                
+                const a = document.createElement('a');
+                a.href = qrUrl;
+                a.download = 'qr-code.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+            
+            function showError(message) {
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
